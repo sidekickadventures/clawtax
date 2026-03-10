@@ -877,55 +877,12 @@
         </div>
     </div>
 
+    <!-- Tax Engine -->
+    <script src="core/tax-engine/taxEngine.js"></script>
+
     <script>
         // Tax Data
-        const TAX_BRACKETS = {
-            single: [
-                { min: 0, max: 11600, rate: 0.10 },
-                { min: 11600, max: 47150, rate: 0.12 },
-                { min: 47150, max: 100525, rate: 0.22 },
-                { min: 100525, max: 191950, rate: 0.24 },
-                { min: 191950, max: 243725, rate: 0.32 },
-                { min: 243725, max: 609350, rate: 0.35 },
-                { min: 609350, max: Infinity, rate: 0.37 }
-            ],
-            married_jointly: [
-                { min: 0, max: 23200, rate: 0.10 },
-                { min: 23200, max: 94300, rate: 0.12 },
-                { min: 94300, max: 201050, rate: 0.22 },
-                { min: 201050, max: 383900, rate: 0.24 },
-                { min: 383900, max: 487450, rate: 0.32 },
-                { min: 487450, max: 731200, rate: 0.35 },
-                { min: 731200, max: Infinity, rate: 0.37 }
-            ],
-            married_separately: [
-                { min: 0, max: 11600, rate: 0.10 },
-                { min: 11600, max: 47150, rate: 0.12 },
-                { min: 47150, max: 100525, rate: 0.22 },
-                { min: 100525, max: 191950, rate: 0.24 },
-                { min: 191950, max: 243725, rate: 0.32 },
-                { min: 243725, max: 365600, rate: 0.35 },
-                { min: 365600, max: Infinity, rate: 0.37 }
-            ],
-            head_household: [
-                { min: 0, max: 16550, rate: 0.10 },
-                { min: 16550, max: 63100, rate: 0.12 },
-                { min: 63100, max: 100500, rate: 0.22 },
-                { min: 100500, max: 191950, rate: 0.24 },
-                { min: 191950, max: 243700, rate: 0.32 },
-                { min: 243700, max: 609350, rate: 0.35 },
-                { min: 609350, max: Infinity, rate: 0.37 }
-            ]
-        };
-
-        const STANDARD_DEDUCTIONS = {
-            single: 14600,
-            married_jointly: 29200,
-            married_separately: 14600,
-            head_household: 21900
-        };
-
-        let currentStep = 1;
+                let currentStep = 1;
 
         // Filing status selection
         document.querySelectorAll('.filing-option').forEach(option => {
@@ -994,27 +951,27 @@
             return document.querySelector('input[name="filingStatus"]:checked').value;
         }
 
-        function calculateBracketTax(income, filingStatus) {
-            const brackets = TAX_BRACKETS[filingStatus];
-            let tax = 0;
-            let remaining = income;
-            for (const bracket of brackets) {
-                if (remaining <= 0) break;
-                const taxable = Math.min(remaining, bracket.max - bracket.min);
-                tax += taxable * bracket.rate;
-                remaining -= taxable;
-            }
-            return Math.round(tax * 100) / 100;
-        }
-
-        function updateLiveEstimate() {
+                function updateLiveEstimate() {
             const income = getIncome();
             const filingStatus = getFilingStatus();
             const standardDeduction = document.getElementById('standardDeduction').checked;
-            const deduction = standardDeduction ? STANDARD_DEDUCTIONS[filingStatus] : 0;
-            const taxableIncome = Math.max(0, income.total - deduction);
-            const tax = calculateBracketTax(taxableIncome, filingStatus);
-            const refund = income.withholding - tax;
+            
+            // Use engine for live estimate
+            const result = ClawTaxEngine.calculate({
+                filing_status: filingStatus,
+                income: {
+                    w2: income.w2Wages,
+                    self_employed: income.selfEmployment,
+                    interest: income.interest,
+                    dividends: income.dividends,
+                    capital_gains: income.capitalGains,
+                    other: income.otherIncome,
+                    withholding: income.withholding
+                },
+                deductions: { standard: standardDeduction }
+            });
+            
+            const refund = result.results.refund_estimate;
             
             const estimateEl = document.getElementById('liveEstimate');
             if (refund >= 0) {
@@ -1030,62 +987,97 @@
             const income = getIncome();
             const filingStatus = getFilingStatus();
             const standardDeduction = document.getElementById('standardDeduction').checked;
-            const deduction = standardDeduction ? STANDARD_DEDUCTIONS[filingStatus] : 0;
-            const taxableIncome = Math.max(0, income.total - deduction);
+            
+            // Use engine for review
+            const result = ClawTaxEngine.calculate({
+                filing_status: filingStatus,
+                income: {
+                    w2: income.w2Wages,
+                    self_employed: income.selfEmployment,
+                    interest: income.interest,
+                    dividends: income.dividends,
+                    capital_gains: income.capitalGains,
+                    other: income.otherIncome,
+                    withholding: income.withholding
+                },
+                deductions: { standard: standardDeduction }
+            });
+            
+            const r = result.results;
 
             document.getElementById('reviewFilingStatus').textContent = 
                 filingStatus.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
             document.getElementById('reviewTaxYear').textContent = document.getElementById('taxYear').value;
-            document.getElementById('reviewIncome').textContent = '$' + income.total.toLocaleString();
-            document.getElementById('reviewDeduction').textContent = '$' + deduction.toLocaleString() + (standardDeduction ? ' (Standard)' : ' (Itemized)');
-            document.getElementById('reviewTaxable').textContent = '$' + taxableIncome.toLocaleString();
+            document.getElementById('reviewIncome').textContent = '$' + r.gross_income.toLocaleString();
+            document.getElementById('reviewDeduction').textContent = '$' + r.deduction.amount.toLocaleString() + ' (' + r.deduction.type + ')';
+            document.getElementById('reviewTaxable').textContent = '$' + r.taxable_income.toLocaleString();
         }
 
         function calculateTax() {
+            // Use the ClawTax Engine for calculation
             const income = getIncome();
             const filingStatus = getFilingStatus();
-            
             const standardDeduction = document.getElementById('standardDeduction').checked;
-            let deduction = STANDARD_DEDUCTIONS[filingStatus];
             
-            if (!standardDeduction) {
-                deduction = 
-                    (parseFloat(document.getElementById('mortgageInterest').value) || 0) +
-                    (parseFloat(document.getElementById('stateLocalTax').value) || 0) +
-                    (parseFloat(document.getElementById('medicalExpenses').value) || 0) +
-                    (parseFloat(document.getElementById('charitableDonations').value) || 0);
-            }
-
-            const taxableIncome = Math.max(0, income.total - deduction);
-            const grossTax = calculateBracketTax(taxableIncome, filingStatus);
-            
-            // Credits
             const numChildren = parseInt(document.getElementById('childTaxCredit').value) || 0;
-            const childCredit = numChildren * 2000;
             const educationCredits = parseFloat(document.getElementById('educationCredits').value) || 0;
             const energyCredits = parseFloat(document.getElementById('energyCredits').value) || 0;
             const otherCredits = parseFloat(document.getElementById('otherCredits').value) || 0;
-            const totalCredits = childCredit + educationCredits + energyCredits + otherCredits;
             
-            const netTax = Math.max(0, grossTax - totalCredits);
-            const refund = income.withholding - netTax;
-
-            document.getElementById('resultGross').textContent = '$' + income.total.toLocaleString();
-            document.getElementById('resultTaxable').textContent = '$' + taxableIncome.toLocaleString();
-            document.getElementById('resultTax').textContent = '$' + grossTax.toLocaleString();
-            document.getElementById('resultCredits').textContent = '-$' + totalCredits.toLocaleString();
-            document.getElementById('resultWithheld').textContent = '$' + income.withholding.toLocaleString();
+            // Build input for engine
+            const input = {
+                filing_status: filingStatus,
+                tax_year: parseInt(document.getElementById('taxYear').value),
+                income: {
+                    w2: income.w2Wages,
+                    self_employed: income.selfEmployment,
+                    interest: income.interest,
+                    dividends: income.dividends,
+                    capital_gains: income.capitalGains,
+                    other: income.otherIncome,
+                    withholding: income.withholding
+                },
+                deductions: {
+                    standard: standardDeduction,
+                    mortgage_interest: standardDeduction ? 0 : (parseFloat(document.getElementById('mortgageInterest').value) || 0),
+                    salt: standardDeduction ? 0 : (parseFloat(document.getElementById('stateLocalTax').value) || 0),
+                    medical: standardDeduction ? 0 : (parseFloat(document.getElementById('medicalExpenses').value) || 0),
+                    charitable: standardDeduction ? 0 : (parseFloat(document.getElementById('charitableDonations').value) || 0)
+                },
+                credits: {
+                    child: numChildren,
+                    education: educationCredits,
+                    energy: energyCredits,
+                    other: otherCredits
+                }
+            };
+            
+            // Call the engine
+            const result = ClawTaxEngine.calculate(input);
+            
+            if (!result.success) {
+                alert('Error: ' + result.error);
+                return;
+            }
+            
+            const r = result.results;
+            
+            document.getElementById('resultGross').textContent = '$' + r.gross_income.toLocaleString();
+            document.getElementById('resultTaxable').textContent = '$' + r.taxable_income.toLocaleString();
+            document.getElementById('resultTax').textContent = '$' + r.federal_tax.toLocaleString();
+            document.getElementById('resultCredits').textContent = '-$' + r.credits.total.toLocaleString();
+            document.getElementById('resultWithheld').textContent = '$' + r.withholding.toLocaleString();
             
             const resultLabel = document.getElementById('resultLabel');
             const resultAmount = document.getElementById('resultAmount');
             
-            if (refund >= 0) {
+            if (r.result === 'refund') {
                 resultLabel.textContent = 'Refund';
-                resultAmount.textContent = '+$' + refund.toLocaleString();
+                resultAmount.textContent = '+$' + r.amount.toLocaleString();
                 resultAmount.className = 'result-item-value positive';
             } else {
                 resultLabel.textContent = 'You Owe';
-                resultAmount.textContent = '-$' + Math.abs(refund).toLocaleString();
+                resultAmount.textContent = '-$' + r.amount.toLocaleString();
                 resultAmount.className = 'result-item-value negative';
             }
 

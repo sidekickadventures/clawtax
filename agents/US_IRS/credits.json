@@ -1,0 +1,86 @@
+{
+    "year": 2024,
+    "credits": {
+        "child_tax_credit": {
+            "label": "Child Tax Credit",
+            "description": "Credit for each qualifying child under 17",
+            "amount": 2000,
+            "refundable": 1700,
+            "phase_out": {
+                "single": { "start": 200000, "end": 240000 },
+                "married_jointly": { "start": 400000, "end": 440000 },
+                "married_separately": { "start": 200000, "end": 220000 },
+                "head_household": { "start": 300000, "end": 340000 }
+            }
+        },
+        "earned_income_credit": {
+            "label": "Earned Income Tax Credit (EITC)",
+            "description": "Refundable credit for low-to-moderate income workers",
+            "type": "refundable",
+            "max_income": {
+                "no_children": 17590,
+                "one_child": 46440,
+                "two_children": 52687,
+                "three_or_more": 56004
+            },
+            "phase_out": {
+                "single": { "start": 9560, "end": 17590 },
+                "married_jointly": { "start": 14660, "end": 22590 }
+            }
+        },
+        "child_and_dependent_care": {
+            "label": "Child and Dependent Care Credit",
+            "description": "Credit for childcare expenses to allow work",
+            "max_credit": 3000,
+            "percentage": 0.35,
+            "phase_out": {
+                "single": { "start": 15000, "end": 43000 },
+                "married_jointly": { "start": 20000, "end": 48000 }
+            }
+        },
+        "education_credits": {
+            "label": "Education Credits",
+            "description": "American Opportunity and Lifetime Learning credits",
+            "types": {
+                "american_opportunity": {
+                    "max_credit": 2500,
+                    "per_year": true,
+                    "limit": 4,
+                    "phase_out": {
+                        "single": { "start": 80000, "end": 90000 },
+                        "married_jointly": { "start": 160000, "end": 180000 }
+                    }
+                },
+                "lifetime_learning": {
+                    "max_credit": 2000,
+                    "per_return": true,
+                    "phase_out": {
+                        "single": { "start": 80000, "end": 90000 },
+                        "married_jointly": { "start": 160000, "end": 180000 }
+                    }
+                }
+            }
+        },
+        "energy_efficiency_credit": {
+            "label": "Energy Efficient Home Credits",
+            "description": "Credits for energy-saving home improvements",
+            "type": "non-refundable",
+            "annual_limit": 1200,
+            "categories": {
+                "solar": { "credit": 0.30 },
+                "wind": { "credit": 0.30 },
+                "insulation": { "credit": 0.10 },
+                "windows": { "credit": 0.10 }
+            }
+        },
+        "savers_credit": {
+            "label": "Retirement Savings Contributions Credit",
+            "description": "Credit for retirement account contributions",
+            "max_credit": 1000,
+            "phase_out": {
+                "single": { "start": 21500, "end": 43000 },
+                "married_jointly": { "start": 43000, "end": 64000 }
+            }
+        }
+    }
+}

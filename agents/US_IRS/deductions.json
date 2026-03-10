@@ -1,0 +1,56 @@
+{
+    "year": 2024,
+    "deductions": {
+        "standard": {
+            "description": "Standard deduction based on filing status",
+            "type": "automatic",
+            "values": {
+                "single": 14600,
+                "married_jointly": 29200,
+                "married_separately": 14600,
+                "head_household": 21900,
+                "qualifying_surviving_spouse": 29200
+            }
+        },
+        "itemized": {
+            "description": "Itemized deductions - choose if greater than standard",
+            "type": "optional",
+            "categories": {
+                "mortgage_interest": {
+                    "label": "Mortgage Interest",
+                    "description": "Interest paid on home mortgage",
+                    "limit": null
+                },
+                "state_local_taxes": {
+                    "label": "State & Local Taxes (SALT)",
+                    "description": "State and local income, sales, and property taxes",
+                    "limit": 10000,
+                    "note": "Capped at $10,000 per year"
+                },
+                "medical_expenses": {
+                    "label": "Medical Expenses",
+                    "description": "Unreimbursed medical and dental expenses",
+                    "limit": null,
+                    "threshold": 0.075,
+                    "note": "Only amount exceeding 7.5% of AGI"
+                },
+                "charitable": {
+                    "label": "Charitable Contributions",
+                    "description": "Donations to qualified charitable organizations",
+                    "limit": null,
+                    "threshold": 0.60,
+                    "note": "Up to 60% of AGI"
+                },
+                "student_loan_interest": {
+                    "label": "Student Loan Interest",
+                    "description": "Interest on qualified student loans",
+                    "limit": 2500,
+                    "phase_out": {
+                        "single": { "start": 75000, "end": 90000 },
+                        "married_jointly": { "start": 155000, "end": 185000 }
+                    }
+                }
+            }
+        }
+    }
+}
