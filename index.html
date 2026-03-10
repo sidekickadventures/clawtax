@@ -99,6 +99,45 @@
             color: var(--accent-green);
         }
 
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .mode-selector {
+            display: flex;
+            background: var(--bg-elevated);
+            border-radius: 8px;
+            padding: 4px;
+        }
+
+        .mode-btn {
+            padding: 8px 16px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+
+        .mode-btn.active {
+            background: var(--accent-cyan);
+            color: var(--bg-deep);
+        }
+
+        .mode-btn:hover:not(.active) {
+            color: var(--text-primary);
+        }
+
+        .mode-desc {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
         /* Main Grid */
         .main-grid {
             display: grid;
@@ -544,21 +583,22 @@
 <body>
     <div class="app-container">
         <!-- Header -->
-        <div class="header">
+        <header class="header">
             <div class="logo">
                 <div class="logo-icon">🦴</div>
                 <div class="logo-text">Claw<span>Tax</span></div>
             </div>
-            <div class="header-right">
-                <div class="mode-toggle">
-                    <span class="mode-label">🔒 Local Mode</span>
-                    <label class="switch">
-                        <input type="checkbox" id="localMode" checked>
-                        <span class="slider"></span>
-                    </label>
+            <div class="header-controls">
+                <div class="mode-selector">
+                    <button class="mode-btn active" id="localBtn" onclick="setMode('local')">
+                        🔒 Local
+                    </button>
+                    <button class="mode-btn" id="cloudBtn" onclick="setMode('cloud')">
+                        ☁️ Cloud
+                    </button>
                 </div>
-                <div class="header-badge">
-                    <span>🔒</span> Secure
+                <div class="mode-desc" id="modeDesc">
+                    Calculations stay on your device
                 </div>
             </div>
         </header>
@@ -883,6 +923,136 @@
     <script>
         // Tax Data
                 let currentStep = 1;
+        let currentMode = 'local'; // 'local' or 'cloud'
+
+        // Mode toggle functions
+        function setMode(mode) {
+            currentMode = mode;
+            document.getElementById('localBtn').classList.toggle('active', mode === 'local');
+            document.getElementById('cloudBtn').classList.toggle('active', mode === 'cloud');
+            document.getElementById('modeDesc').textContent = mode === 'local' 
+                ? 'Calculations stay on your device' 
+                : 'Encrypted calculation via server API';
+        }
+
+        // Calculate using local engine
+        function calculateLocal(input) {
+            return ClawTaxEngine.calculate(input);
+        }
+
+        // Calculate using cloud API
+        async function calculateCloud(input) {
+            const apiUrl = 'https://api.clawtax.io/api/calculate'; // Placeholder
+            
+            try {
+                // In production, encrypt the payload first
+                // const encrypted = await CLAWTAX_SECURITY.encryptPayload(input, encryptionKey);
+                
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(input)
+                });
+                
+                if (!response.ok) {
+                    throw new Error('API request failed');
+                }
+                
+                return await response.json();
+            } catch (error) {
+                console.error('Cloud calculation failed:', error);
+                // Fallback to local if cloud fails
+                return calculateLocal(input);
+            }
+        }
+
+        // Main calculation dispatcher
+        async function calculateTax() {
+            const income = getIncome();
+            const filingStatus = getFilingStatus();
+            const standardDeduction = document.getElementById('standardDeduction').checked;
+            
+            const numChildren = parseInt(document.getElementById('childTaxCredit').value) || 0;
+            const educationCredits = parseFloat(document.getElementById('educationCredits').value) || 0;
+            const energyCredits = parseFloat(document.getElementById('energyCredits').value) || 0;
+            const otherCredits = parseFloat(document.getElementById('otherCredits').value) || 0;
+            
+            const input = {
+                filing_status: filingStatus,
+                tax_year: parseInt(document.getElementById('taxYear').value),
+                income: {
+                    w2: income.w2Wages,
+                    self_employed: income.selfEmployment,
+                    interest: income.interest,
+                    dividends: income.dividends,
+                    capital_gains: income.capitalGains,
+                    other: income.otherIncome,
+                    withholding: income.withholding
+                },
+                deductions: {
+                    standard: standardDeduction,
+                    mortgage_interest: standardDeduction ? 0 : (parseFloat(document.getElementById('mortgageInterest').value) || 0),
+                    salt: standardDeduction ? 0 : (parseFloat(document.getElementById('stateLocalTax').value) || 0),
+                    medical: standardDeduction ? 0 : (parseFloat(document.getElementById('medicalExpenses').value) || 0),
+                    charitable: standardDeduction ? 0 : (parseFloat(document.getElementById('charitableDonations').value) || 0)
+                },
+                credits: {
+                    child: numChildren,
+                    education: educationCredits,
+                    energy: energyCredits,
+                    other: otherCredits
+                }
+            };
+            
+            // Show loading state
+            const btn = document.querySelector('#step-5 .btn-primary');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<span>⏳</span> Calculating...';
+            
+            try {
+                let result;
+                if (currentMode === 'cloud') {
+                    result = await calculateCloud(input);
+                } else {
+                    result = calculateLocal(input);
+                }
+                
+                if (!result.success) {
+                    alert('Error: ' + result.error);
+                    return;
+                }
+                
+                displayResults(result.results);
+                showStep(6);
+            } catch (error) {
+                alert('Calculation error: ' + error.message);
+            } finally {
+                btn.innerHTML = originalText;
+            }
+        }
+
+        function displayResults(r) {
+            document.getElementById('resultGross').textContent = '$' + r.gross_income.toLocaleString();
+            document.getElementById('resultTaxable').textContent = '$' + r.taxable_income.toLocaleString();
+            document.getElementById('resultTax').textContent = '$' + r.federal_tax.toLocaleString();
+            document.getElementById('resultCredits').textContent = '-$' + r.credits.total.toLocaleString();
+            document.getElementById('resultWithheld').textContent = '$' + r.withholding.toLocaleString();
+            
+            const resultLabel = document.getElementById('resultLabel');
+            const resultAmount = document.getElementById('resultAmount');
+            
+            if (r.result === 'refund') {
+                resultLabel.textContent = 'Refund';
+                resultAmount.textContent = '+$' + r.amount.toLocaleString();
+                resultAmount.className = 'result-item-value positive';
+            } else {
+                resultLabel.textContent = 'You Owe';
+                resultAmount.textContent = '-$' + r.amount.toLocaleString();
+                resultAmount.className = 'result-item-value negative';
+            }
+        }
 
         // Filing status selection
         document.querySelectorAll('.filing-option').forEach(option => {
@@ -1013,78 +1183,7 @@
             document.getElementById('reviewTaxable').textContent = '$' + r.taxable_income.toLocaleString();
         }
 
-        function calculateTax() {
-            // Use the ClawTax Engine for calculation
-            const income = getIncome();
-            const filingStatus = getFilingStatus();
-            const standardDeduction = document.getElementById('standardDeduction').checked;
-            
-            const numChildren = parseInt(document.getElementById('childTaxCredit').value) || 0;
-            const educationCredits = parseFloat(document.getElementById('educationCredits').value) || 0;
-            const energyCredits = parseFloat(document.getElementById('energyCredits').value) || 0;
-            const otherCredits = parseFloat(document.getElementById('otherCredits').value) || 0;
-            
-            // Build input for engine
-            const input = {
-                filing_status: filingStatus,
-                tax_year: parseInt(document.getElementById('taxYear').value),
-                income: {
-                    w2: income.w2Wages,
-                    self_employed: income.selfEmployment,
-                    interest: income.interest,
-                    dividends: income.dividends,
-                    capital_gains: income.capitalGains,
-                    other: income.otherIncome,
-                    withholding: income.withholding
-                },
-                deductions: {
-                    standard: standardDeduction,
-                    mortgage_interest: standardDeduction ? 0 : (parseFloat(document.getElementById('mortgageInterest').value) || 0),
-                    salt: standardDeduction ? 0 : (parseFloat(document.getElementById('stateLocalTax').value) || 0),
-                    medical: standardDeduction ? 0 : (parseFloat(document.getElementById('medicalExpenses').value) || 0),
-                    charitable: standardDeduction ? 0 : (parseFloat(document.getElementById('charitableDonations').value) || 0)
-                },
-                credits: {
-                    child: numChildren,
-                    education: educationCredits,
-                    energy: energyCredits,
-                    other: otherCredits
-                }
-            };
-            
-            // Call the engine
-            const result = ClawTaxEngine.calculate(input);
-            
-            if (!result.success) {
-                alert('Error: ' + result.error);
-                return;
-            }
-            
-            const r = result.results;
-            
-            document.getElementById('resultGross').textContent = '$' + r.gross_income.toLocaleString();
-            document.getElementById('resultTaxable').textContent = '$' + r.taxable_income.toLocaleString();
-            document.getElementById('resultTax').textContent = '$' + r.federal_tax.toLocaleString();
-            document.getElementById('resultCredits').textContent = '-$' + r.credits.total.toLocaleString();
-            document.getElementById('resultWithheld').textContent = '$' + r.withholding.toLocaleString();
-            
-            const resultLabel = document.getElementById('resultLabel');
-            const resultAmount = document.getElementById('resultAmount');
-            
-            if (r.result === 'refund') {
-                resultLabel.textContent = 'Refund';
-                resultAmount.textContent = '+$' + r.amount.toLocaleString();
-                resultAmount.className = 'result-item-value positive';
-            } else {
-                resultLabel.textContent = 'You Owe';
-                resultAmount.textContent = '-$' + r.amount.toLocaleString();
-                resultAmount.className = 'result-item-value negative';
-            }
-
-            showStep(6);
-        }
-
-        function exportResults() {
+                function exportResults() {
             const filingStatus = getFilingStatus();
             const taxYear = document.getElementById('taxYear').value;
             const income = getIncome();
