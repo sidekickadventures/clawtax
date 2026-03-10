@@ -544,13 +544,22 @@
 <body>
     <div class="app-container">
         <!-- Header -->
-        <header class="header">
+        <div class="header">
             <div class="logo">
                 <div class="logo-icon">🦴</div>
                 <div class="logo-text">Claw<span>Tax</span></div>
             </div>
-            <div class="header-badge">
-                <span>🔒</span> Secure • Local • Private
+            <div class="header-right">
+                <div class="mode-toggle">
+                    <span class="mode-label">🔒 Local Mode</span>
+                    <label class="switch">
+                        <input type="checkbox" id="localMode" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="header-badge">
+                    <span>🔒</span> Secure
+                </div>
             </div>
         </header>
 
