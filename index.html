@@ -877,7 +877,12 @@
 
                     <div class="btn-row">
                         <button class="btn btn-secondary" onclick="prevStep(5)">← Edit</button>
-                        <button class="btn btn-primary" onclick="exportResults()">📥 Export Report</button>
+                        <div class="btn-row">
+                        <button class="btn btn-secondary" onclick="prevStep(5)">← Edit</button>
+                        <button class="btn btn-secondary" onclick="exportResults('json')">📄 JSON</button>
+                        <button class="btn btn-secondary" onclick="exportResults('pdf')">📄 PDF</button>
+                        <button class="btn btn-primary" onclick="exportResults('txt')">📥 Export</button>
+                    </div>
                     </div>
                 </div>
             </div>
@@ -922,8 +927,9 @@
 
     <script>
         // Tax Data
-                let currentStep = 1;
+        let currentStep = 1;
         let currentMode = 'local'; // 'local' or 'cloud'
+        let lastCalculationResult = null;
 
         // Mode toggle functions
         function setMode(mode) {
@@ -1034,6 +1040,9 @@
         }
 
         function displayResults(r) {
+            // Store result for export
+            lastCalculationResult = { results: r };
+            
             document.getElementById('resultGross').textContent = '$' + r.gross_income.toLocaleString();
             document.getElementById('resultTaxable').textContent = '$' + r.taxable_income.toLocaleString();
             document.getElementById('resultTax').textContent = '$' + r.federal_tax.toLocaleString();
@@ -1183,13 +1192,97 @@
             document.getElementById('reviewTaxable').textContent = '$' + r.taxable_income.toLocaleString();
         }
 
-                function exportResults() {
+                function exportResults(format) {
             const filingStatus = getFilingStatus();
             const taxYear = document.getElementById('taxYear').value;
-            const income = getIncome();
-            const taxableIncome = Math.max(0, income.total - STANDARD_DEDUCTIONS[filingStatus]);
             
-            const report = `
+            // Get the latest calculation result
+            const result = lastCalculationResult;
+            if (!result) {
+                alert('No calculation results to export. Please calculate first.');
+                return;
+            }
+            
+            const r = result.results;
+            
+            if (format === 'json') {
+                // Export as JSON
+                const jsonData = JSON.stringify({
+                    tax_year: taxYear,
+                    filing_status: filingStatus,
+                    mode: currentMode,
+                    results: r,
+                    exported_at: new Date().toISOString()
+                }, null, 2);
+                
+                downloadFile(jsonData, `ClawTax_${taxYear}_Summary.json`, 'application/json');
+                
+            } else if (format === 'pdf') {
+                // Generate a printable HTML that can be saved as PDF
+                const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ClawTax ${taxYear} Summary</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; }
+        h1 { color: #1a2438; border-bottom: 2px solid #00d4ff; padding-bottom: 10px; }
+        .section { margin: 20px 0; }
+        .section h2 { color: #00d4ff; font-size: 14px; text-transform: uppercase; }
+        .row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee; }
+        .row:last-child { border-bottom: none; }
+        .label { color: #666; }
+        .value { font-weight: bold; }
+        .total { font-size: 18px; color: #00d4ff; }
+        .refund { color: #00ff88; }
+        .owed { color: #ff4757; }
+        .footer { margin-top: 40px; text-align: center; color: #999; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <h1>🦴 ClawTax - ${taxYear} Tax Summary</h1>
+    
+    <div class="section">
+        <h2>Filing Information</h2>
+        <div class="row"><span class="label">Filing Status</span><span class="value">${filingStatus.replace('_', ' ').toUpperCase()}</span></div>
+        <div class="row"><span class="label">Tax Year</span><span class="value">${taxYear}</span></div>
+    </div>
+    
+    <div class="section">
+        <h2>Income</h2>
+        <div class="row"><span class="label">Gross Income</span><span class="value">$${r.gross_income.toLocaleString()}</span></div>
+        <div class="row"><span class="label">Deduction (${r.deduction.type})</span><span class="value">-$${r.deduction.amount.toLocaleString()}</span></div>
+        <div class="row"><span class="label">Taxable Income</span><span class="value">$${r.taxable_income.toLocaleString()}</span></div>
+    </div>
+    
+    <div class="section">
+        <h2>Tax Calculation</h2>
+        <div class="row"><span class="label">Federal Tax</span><span class="value">$${r.federal_tax.toLocaleString()}</span></div>
+        <div class="row"><span class="label">Tax Credits</span><span class="value">-$${r.credits.total.toLocaleString()}</span></div>
+        <div class="row"><span class="label">Net Tax</span><span class="value total">$${r.net_tax.toLocaleString()}</span></div>
+    </div>
+    
+    <div class="section">
+        <h2>Result</h2>
+        <div class="row"><span class="label">Withheld</span><span class="value">$${r.withholding.toLocaleString()}</span></div>
+        <div class="row">
+            <span class="label">${r.result === 'refund' ? 'Refund' : 'Amount Owed'}</span>
+            <span class="value total ${r.result === 'refund' ? 'refund' : 'owed'}">$${r.amount.toLocaleString()}</span>
+        </div>
+    </div>
+    
+    <div class="footer">
+        🔒 Generated by ClawTax - Secure Local Tax Calculator<br>
+        ${new Date().toLocaleString()}
+    </div>
+</body>
+</html>`;
+                
+                downloadFile(htmlContent, `ClawTax_${taxYear}_Summary.html`, 'text/html');
+                
+            } else {
+                // Export as text
+                const report = `
 ╔══════════════════════════════════════════════════════════╗
 ║                   CLAWTAX - TAX SUMMARY                   ║
 ║                      ${taxYear} Tax Year                      ║
@@ -1197,20 +1290,39 @@
 ║ FILING STATUS: ${filingStatus.replace('_', ' ').toUpperCase().padEnd(47)}║
 ╠══════════════════════════════════════════════════════════╣
 ║ INCOME                                                     ║
-║   Gross Income:         $${income.total.toLocaleString().padStart(12)}            ║
-║   Standard Deduction:   $${STANDARD_DEDUCTIONS[filingStatus].toLocaleString().padStart(12)}            ║
-║   Taxable Income:       $${taxableIncome.toLocaleString().padStart(12)}            ║
+║   Gross Income:         $${r.gross_income.toLocaleString().padStart(12)}            ║
+║   Deduction (${r.deduction.type}):   $${r.deduction.amount.toLocaleString().padStart(12)}            ║
+║   Taxable Income:       $${r.taxable_income.toLocaleString().padStart(12)}            ║
+╠══════════════════════════════════════════════════════════╣
+║ TAX CALCULATION                                           ║
+║   Federal Tax:          $${r.federal_tax.toLocaleString().padStart(12)}            ║
+║   Tax Credits:         -$${r.credits.total.toLocaleString().padStart(11)}            ║
+║   Net Tax:             $${r.net_tax.toLocaleString().padStart(12)}            ║
 ╠══════════════════════════════════════════════════════════╣
 ║ RESULT                                                     ║
-║   Federal Withheld:     $${income.withholding.toLocaleString().padStart(12)}            ║
-║   ${refund >= 0 ? 'ESTIMATED REFUND:'.padEnd(52)}║
-║   ${refund >= 0 ? '$' + refund.toLocaleString().padEnd(51)}║
+║   Withheld:             $${r.withholding.toLocaleString().padStart(12)}            ║
+║   ${r.result === 'refund' ? 'ESTIMATED REFUND:'.padEnd(52)}║
+║   ${r.result === 'refund' ? '$' + r.amount.toLocaleString().padEnd(51)}║
 ╚══════════════════════════════════════════════════════════╝
 
 🔒 Generated by ClawTax - Secure Local Tax Calculator
-`;
-            alert('Report generated! Check your downloads.');
+${new Date().toISOString()}`;
+                
+                downloadFile(report, `ClawTax_${taxYear}_Summary.txt`, 'text/plain');
+            }
         }
-    </script>
-</body>
-</html>
+        
+        // Helper function to download files
+        function downloadFile(content, filename, mimeType) {
+            const blob = new Blob([content], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+        
+        let lastCalculationResult = null;
