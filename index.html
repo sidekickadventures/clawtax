@@ -657,22 +657,22 @@
                     <div class="form-group">
                         <label class="form-label">Filing Status</label>
                         <div class="filing-grid">
-                            <label class="filing-option selected">
+                            <label class="filing-option selected" onclick="selectFilingStatus(this)">
                                 <input type="radio" name="filingStatus" value="single" checked>
                                 <div class="filing-icon">👤</div>
                                 <div class="filing-name">Single</div>
                             </label>
-                            <label class="filing-option">
+                            <label class="filing-option" onclick="selectFilingStatus(this)">
                                 <input type="radio" name="filingStatus" value="married_jointly">
                                 <div class="filing-icon">👫</div>
                                 <div class="filing-name">Married Jointly</div>
                             </label>
-                            <label class="filing-option">
+                            <label class="filing-option" onclick="selectFilingStatus(this)">
                                 <input type="radio" name="filingStatus" value="married_separately">
                                 <div class="filing-icon">👤</div>
                                 <div class="filing-name">Married Separate</div>
                             </label>
-                            <label class="filing-option">
+                            <label class="filing-option" onclick="selectFilingStatus(this)">
                                 <input type="radio" name="filingStatus" value="head_household">
                                 <div class="filing-icon">🏠</div>
                                 <div class="filing-name">Head of Household</div>
@@ -949,6 +949,14 @@
             if (modeDesc) modeDesc.textContent = mode === 'local' 
                 ? 'Calculations stay on your device' 
                 : 'Encrypted calculation via server API';
+        }
+
+        // Filing status selection
+        function selectFilingStatus(element) {
+            document.querySelectorAll('.filing-option').forEach(o => o.classList.remove('selected'));
+            element.classList.add('selected');
+            element.querySelector('input').checked = true;
+            updateLiveEstimate();
         }
 
         // Calculate using local engine
